@@ -28,7 +28,7 @@
 # 1getCodeplexPages.py <datasource_id> <db password>
 
 # purpose:
-# grab all the authors, author urls, pages, and page url of page updates for projects stored on Codeplex before it was shut down
+# grab all the user htmls from Codeplex before it was shut down
 ################################################################
 
 import pymysql
