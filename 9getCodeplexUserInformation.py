@@ -117,12 +117,10 @@ for project in projectList:
            # get date user became a member
            memberSinceList = dates.find("p").contents[1].contents[0]
            memberSince = date_converter(memberSinceList)
-           print("memberSince: ", memberSince)
 
            # get the last time the user visited
            lastVisitList = dates.find("p").contents[5].contents[0]
            lastVisit = date_converter(lastVisitList)
-           print("lastVisit: ", lastVisit)
            
            #get the user personal statement
            personal =  soup2.find("div", id="user_right_column") 
