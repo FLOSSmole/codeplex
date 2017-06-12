@@ -28,8 +28,10 @@
 # 1getCodeplexPages.py <datasource_id> <db password>
 
 # purpose:
-# grab all the username, personal statement, date joined, and last visit date of each user stored on Codeplex before it was shut down
+# grab all the username, personal statement, date joined, and last visit date
+# of each user stored on Codeplex before it was shut down
 ################################################################
+
 import pymysql
 import datetime
 from bs4 import BeautifulSoup
@@ -40,49 +42,51 @@ except ImportError:
     import urllib2
 
 # grab commandline args
-datasourceID = 70910 
+datasourceID = 70910
 lastUpdated = None
+
 
 # converts months into their number
 def month_converter(month):
-    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', \
+    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
               'August', 'September', 'October', 'November', 'December']
     return months.index(month) + 1
+
 
 # converts date to YYYY-MM-DD format
 def date_converter(listName):
     date = listName.split(' ')
     month = date[0]
     day = date[1].split(',')[0]
-    year = date[2] 
+    year = date[2]
     monthNum = month_converter(month)
     return '{}-{}-{}'.format(year, monthNum, day)
-    
-    
+
 # Open remote database connection
-dbconn = pymysql.connect(host='',
-                         user='',
-                         passwd=pw,
-                         db='',
+dbconn = pymysql.connect(host='flossdata.syr.edu',
+                         user='cfrankel',
+                         passwd='Marco1997',
+                         db='test',
                          use_unicode=True,
                          charset="utf8mb4",
                          autocommit=True)
 cursor = dbconn.cursor()
 
-selectProjectsQuery = 'SELECT proj_name FROM cp_projects_indexes \
+selectProjectsQuery = 'SELECT proj_name, people_html FROM cp_projects_indexes \
                        WHERE datasource_id = %s \
                        ORDER BY 1 \
-                       LIMIT 100'
+                       LIMIT 15'
 
 insertHTMLQuery = 'INSERT IGNORE INTO cp_project_people \
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)'  
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)'
 
 cursor.execute(selectProjectsQuery, (datasourceID,))
 projectList = cursor.fetchall()
 
 # insert project pages
 for project in projectList:
-    projectName = project[0] 
+    projectName = project[0]
+    peopleHTML = project[1]
     print("grabbing", projectName)
 
     # set up headers
@@ -94,55 +98,51 @@ for project in projectList:
            'Connection': 'keep-alive'}
 
     try:
-        # grab the project page
-        projectUrl = 'http://' + projectName + '.codeplex.com/team/view'
-        req = urllib2.Request(projectUrl, headers=hdr)
-        projecthtml = urllib2.urlopen(req).read()
-        
-        soup = BeautifulSoup(projecthtml, "html.parser")
-        div = soup.find("div", id="ProjectMembers")     
+        soup = BeautifulSoup(peopleHTML, "html.parser")
+        div = soup.find("div", id="ProjectMembers")
         listOfUsers = div.find_all("a")
-        
+
         for user in listOfUsers:
-           username = user.contents[0]
-           print(username)
-           userUrl = 'http://www.codeplex.com/site/users/view/' + username
+            username = user.contents[0]
+            print(username)
+            userUrl = 'http://www.codeplex.com/site/users/view/' + username
 
-           req2 = urllib2.Request(userUrl, headers=hdr)
-           userhtml = urllib2.urlopen(req2).read()
+            req2 = urllib2.Request(userUrl, headers=hdr)
+            userhtml = urllib2.urlopen(req2).read()
 
-           soup2 = BeautifulSoup(userhtml, "html.parser")
-           dates = soup2.find("div", id="user_left_column") 
-           
-           # get date user became a member
-           memberSinceList = dates.find("p").contents[1].contents[0]
-           memberSince = date_converter(memberSinceList)
+            soup2 = BeautifulSoup(userhtml, "html.parser")
+            dates = soup2.find("div", id="user_left_column")
 
-           # get the last time the user visited
-           lastVisitList = dates.find("p").contents[5].contents[0]
-           lastVisit = date_converter(lastVisitList)
-           
-           #get the user personal statement
-           personal =  soup2.find("div", id="user_right_column") 
-           personalStatement = personal.find("p")
-           statement = ''
-           
-           if len(personalStatement.contents[1].contents[0]) == 1:
-               code = personalStatement.find('div', {'class':'wikidoc'}).contents 
-               for c in code:
+            # get date user became a member
+            memberSinceList = dates.find("p").contents[1].contents[0]
+            memberSince = date_converter(memberSinceList)
+            print("memberSince: ", memberSince)
+
+            # get the last time the user visited
+            lastVisitList = dates.find("p").contents[5].contents[0]
+            lastVisit = date_converter(lastVisitList)
+            print("lastVisit: ", lastVisit)
+
+            # get the user personal statement
+            personal = soup2.find("div", id="user_right_column")
+            personalStatement = personal.find("p")
+            statement = ''
+
+            if len(personalStatement.contents[1].contents[0]) == 1:
+                code = personalStatement.find('div', {'class': 'wikidoc'}).contents
+                for c in code:
                    statement += str(c) + ' '
-           else:
-               statement = 'No personal statement has been written.'
-          
-           lastUpdated = datetime.datetime.now()
-           cursor.execute(insertHTMLQuery, (datasourceID, username, statement, memberSince, lastVisit, userhtml, lastUpdated)) 
-           dbconn.commit()
-         
+            else:
+                statement = 'No personal statement has been written.'
+            print(statement)
+            lastUpdated = datetime.datetime.now()
+            # cursor.execute(insertHTMLQuery, (datasourceID, username, statement, memberSince, lastVisit, userhtml, lastUpdated))
+            dbconn.commit()
+
     except pymysql.Error as error:
         print(error)
         dbconn.rollback()
     except:
         print()
-        
-dbconn.close()
 
+dbconn.close()
