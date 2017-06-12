@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""
+Created on Mon Jun 12 09:46:28 2017
+
+@author: megan
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 # This program is free software; you can redistribute it
 # and/or modify it under the terms of GPL v3
 #
@@ -34,21 +42,17 @@
 
 import sys
 import pymysql
-import datetime
 import re
-import getpass
-password = getpass.getpass()
 
-datasourceID = 70910
-lastUpdated = 'Null'
+datasourceID = sys.argv[1]
+password     = sys.argv[2]
 
-# Open remote database connection
-dbconn = pymysql.connect(host= "",
-                         user= "",
+dbconn = pymysql.connect(host='flossdata.syr.edu',
+                         user='megan',
                          passwd=password,
-                         db="",
+                         db='codeplex',
                          use_unicode=True,
-                         charset="utf8mb4",
+                         charset='utf8mb4',
                          autocommit=True)
 cursor = dbconn.cursor()
 
@@ -59,34 +63,32 @@ selectProjects = 'SELECT proj_name \
 selectIndexes = 'SELECT home_html \
                  FROM cp_projects_indexes \
                  WHERE datasource_id = %s \
-                 AND proj_name = %s'      
-                 
+                 AND proj_name = %s'
+
 updateProjects = 'UPDATE cp_projects SET \
                   proj_status= %s, \
-                  last_updated = %s \
+                  last_updated = now() \
                   WHERE proj_name = %s AND datasource_id = %s'
- 
-# grab the project list                  
+
+# grab the project list
+print('Selecting projects...')
 cursor.execute(selectProjects, (datasourceID,))
 projectList = cursor.fetchall()
 
 for project in projectList:
+    match = None
     projectName = project[0]
-    print("parsing:", projectName)
-    
-    #grab the index
+    print('parsing project:', projectName)
+
     cursor.execute(selectIndexes, (datasourceID, projectName))
     homeHtml = cursor.fetchone()[0]
-    
+
+    # parse out the project's most recent status
     regex = 'status<\/span><\/th>\s*<td>(.*?)<\/td'
     match = re.findall(regex, homeHtml)
-    
-    #parse out the project's most recent status
+
     if match:
-        current_time = datetime.datetime.now()
-        cursor.execute(updateProjects, (match[0], current_time, projectName, datasourceID))
-   
+        print('updating status!')
+        cursor.execute(updateProjects, (match[0], projectName, datasourceID))
+
 dbconn.close()
-
-
-                  
