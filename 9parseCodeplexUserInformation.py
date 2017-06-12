@@ -64,9 +64,9 @@ def date_converter(listName):
 
 # Open remote database connection
 dbconn = pymysql.connect(host='flossdata.syr.edu',
-                         user='cfrankel',
-                         passwd='Marco1997',
-                         db='test',
+                         user='',
+                         passwd='',
+                         db='',
                          use_unicode=True,
                          charset="utf8mb4",
                          autocommit=True)
