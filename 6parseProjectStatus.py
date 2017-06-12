@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Jun 12 09:46:28 2017
-
-@author: megan
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # This program is free software; you can redistribute it
 # and/or modify it under the terms of GPL v3
 #
