@@ -44,8 +44,7 @@ except ImportError:
 datasourceID = sys.argv[1]
 pw = sys.argv[2]
 
-
-dbuser = 'msquire'
+dbuser = 'megan'
 db = 'codeplex'
 dbhost = 'flossdata.syr.edu'
 
@@ -57,8 +56,11 @@ dbconn = pymysql.connect(host= dbhost,
                          charset='utf8mb4')
 cursor = dbconn.cursor()
 
-selectProjectsQuery = 'SELECT proj_name FROM cp_projects\
-                       WHERE datasource_id = %s'              
+selectProjectsQuery = 'SELECT cp.proj_name, cp.proj_url FROM cp_projects cp\
+                       INNER JOIN cp_projects_indexes cpi \
+                       ON cpi.proj_name = cp.proj_name\
+                       AND cpi.datasource_id = cp.datasource_id\
+                       WHERE cpi.datasource_id = %s'              
 
 updateProjects = 'UPDATE cp_projects SET \
                   proj_license= %s, \
