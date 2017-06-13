@@ -3,8 +3,8 @@
 # This program is free software; you can redistribute it
 # and/or modify it under the terms of GPL v3
 #
-# Copyright (C) 2004-2017 Megan Squire <msquire@elon.edu>
-# Contribution from:
+# Copyright (C) 2017 Megan Squire <msquire@elon.edu>
+# With code contributions from:
 # Caroline Frankel
 #
 # We're working on this at http://flossmole.org - Come help us build
@@ -25,49 +25,47 @@
 #
 ################################################################
 # usage:
-# 1getCodeplexPages.py <datasource_id> <db password>
+# 7getCodeplexPeopleHtml.py <datasource_id> <db password>
 
 # purpose:
 # grab all the user htmls from Codeplex before it was shut down
 ################################################################
 
 import pymysql
-import datetime
 
 try:
     import urllib.request as urllib2
 except ImportError:
     import urllib2
+import sys
 
-# grab commandline args
-datasourceID = 70910 
-lastUpdated = None
-
+datasourceID = sys.argv[1]
+password     = sys.argv[2]
 
 # Open remote database connection
 dbconn = pymysql.connect(host='',
                          user='',
-                         passwd=pw,
-                         db='',
+                         passwd=password,
+                         db='codeplex',
                          use_unicode=True,
-                         charset="utf8mb4",
+                         charset='utf8mb4',
                          autocommit=True)
 cursor = dbconn.cursor()
 
 selectProjectsQuery = 'SELECT proj_name FROM cp_projects_indexes \
                        WHERE datasource_id = %s \
-                       ORDER BY 1 \
-                       LIMIT 20'
+                       ORDER BY 1'
 
 updateHTMLQuery = 'UPDATE cp_projects_indexes \
-                        SET people_html = %s, last_updated = %s \
-                        WHERE proj_name = %s AND datasource_id = 70910' 
+                        SET people_html = %s, last_updated = now() \
+                        WHERE proj_name = %s AND datasource_id = %s'
 
 cursor.execute(selectProjectsQuery, (datasourceID,))
 projectList = cursor.fetchall()
 
 # insert project pages
 for project in projectList:
+    peoplehtml = None
     projectName = project[0]
     print("grabbing", projectName)
 
@@ -82,39 +80,20 @@ for project in projectList:
     try:
         # grab the user page
         peopleUrl = 'http://' + projectName + '.codeplex.com/team/view'
-        print(peopleUrl)
+        # print(peopleUrl)
         req = urllib2.Request(peopleUrl, headers=hdr)
         peoplehtml = urllib2.urlopen(req).read()
-        print(peoplehtml)
-        
-        lastUpdated = datetime.datetime.now()
-        cursor.execute(updateHTMLQuery, (peoplehtml,lastUpdated, projectName))
-        dbconn.commit()
+        if peoplehtml:
+            print('writing to db')
+            cursor.execute(updateHTMLQuery, (peoplehtml,
+                                             projectName,
+                                             datasourceID))
+            dbconn.commit()
     except pymysql.Error as error:
         print(error)
         dbconn.rollback()
-    except:
-        print()
-        
+    except urllib2.HTTPError as herror:
+        print(herror)
+        dbconn.rollback()
+
 dbconn.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
