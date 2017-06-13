@@ -31,7 +31,6 @@
 # grab all the username, personal statement, date joined, and last visit date
 # of each user stored on Codeplex before it was shut down
 ################################################################
-
 import pymysql
 import sys
 from bs4 import BeautifulSoup
@@ -47,6 +46,52 @@ pw = sys.argv[2]
 dbuser = 'megan'
 db = 'codeplex'
 dbhost = 'flossdata.syr.edu'
+
+
+# collects and inserts information on user to table
+def info(username):
+    print(username)
+
+    userUrl = 'http://www.codeplex.com/site/users/view/' + username
+    print(userUrl)
+
+    # get user's html page
+    req2 = urllib2.Request(userUrl, headers=hdr)
+    userhtml = urllib2.urlopen(req2).read()
+
+    soup2 = BeautifulSoup(userhtml, "html.parser")
+    dates = soup2.find("div", id="user_left_column")
+
+    # get date user became a member
+    memberSinceList = dates.find("p").contents[1].contents[0]
+    memberSince = date_converter(memberSinceList)
+    print("memberSince: ", memberSince)
+
+    # get the last time the user visited
+    lastVisitList = dates.find("p").contents[5].contents[0]
+    lastVisit = date_converter(lastVisitList)
+    print("lastVisit: ", lastVisit)
+
+    # get the user personal statement
+    personal = soup2.find("div", id="user_right_column")
+    personalStatement = personal.find("p")
+    statement = ''
+
+    if len(personalStatement.contents[1].contents[0]) == 1:
+        code = personalStatement.find('div', {'class': 'wikidoc'}).contents
+        for c in code:
+            statement += str(c) + ' '
+    else:
+        statement = 'No personal statement has been written.'
+    print(statement)
+    cursor.execute(insertHTMLQuery, (datasourceID,
+                                     username,
+                                     statement,
+                                     memberSince,
+                                     lastVisit,
+                                     userhtml))
+    dbconn.commit()
+    print(username, "inserted!")
 
 
 # converts months into their number
@@ -120,53 +165,33 @@ for project in projectList:
     # grab the people page
     cursor.execute(selectProjectsIndexes, (datasourceID, projectName))
     peopleHtml = cursor.fetchone()[0]
-
     try:
         soup = BeautifulSoup(peopleHtml, "html.parser")
-        div = soup.find("div", id="ProjectMembers")
-        listOfUsers = div.find_all("a")
+        div = soup.find('div', id='ProjectMembers')
 
-        for user in listOfUsers:
-            username = user.contents[0]
-            print(username)
-            userUrl = 'http://www.codeplex.com/site/users/view/' + username
+        # Get all of the Coordinators
+        listOfCoordinators = div.find("div", id="CoordinatorsContainer")
+        coordinatorLine = listOfCoordinators.find_all('div', {'class': 'UserDetails'})
 
-            # get user's html page
-            req2 = urllib2.Request(userUrl, headers=hdr)
-            userhtml = urllib2.urlopen(req2).read()
+        for coordinator in coordinatorLine:
+            username = coordinator.find('a').contents[0]
+            info(username)
 
-            soup2 = BeautifulSoup(userhtml, "html.parser")
-            dates = soup2.find("div", id="user_left_column")
+        # Get all of the Developers
+        listOfDevelopers = div.find("div", id="DevelopersContainer")
+        developerLine = listOfDevelopers.find_all('div', {'class': 'UserDetails'})
 
-            # get date user became a member
-            memberSinceList = dates.find("p").contents[1].contents[0]
-            memberSince = date_converter(memberSinceList)
-            print("memberSince: ", memberSince)
+        for developer in developerLine:
+            username = developer.find('a').contents[0]
+            info(username)
 
-            # get the last time the user visited
-            lastVisitList = dates.find("p").contents[5].contents[0]
-            lastVisit = date_converter(lastVisitList)
-            print("lastVisit: ", lastVisit)
+        # Get all of the Editors
+        listOfEditors = div.find("div", id="EditorsContainer")
+        editorLine = listOfEditors.find_all('div', {'class': 'UserDetails'})
 
-            # get the user personal statement
-            personal = soup2.find("div", id="user_right_column")
-            personalStatement = personal.find("p")
-            statement = ''
-
-            if len(personalStatement.contents[1].contents[0]) == 1:
-                code = personalStatement.find('div', {'class': 'wikidoc'}).contents
-                for c in code:
-                    statement += str(c) + ' '
-            else:
-                statement = 'No personal statement has been written.'
-            # print(statement)
-            cursor.execute(insertHTMLQuery, (datasourceID,
-                                             username,
-                                             statement,
-                                             memberSince,
-                                             lastVisit,
-                                             userhtml))
-            dbconn.commit()
+        for editor in editorLine:
+            username = editor.find('a').contents[0]
+            info(username)
 
     except pymysql.Error as error:
         print(error)
