@@ -25,7 +25,7 @@
 #
 ################################################################
 # usage:
-# 1getCodeplexPages.py <datasource_id> <db password>
+# 9parseCodeplexUsers.py <datasource_id> <db password>
 
 # purpose:
 # grab all the username, personal statement, date joined, and last visit date
@@ -33,7 +33,7 @@
 ################################################################
 
 import pymysql
-import datetime
+import sys
 from bs4 import BeautifulSoup
 
 try:
@@ -41,16 +41,29 @@ try:
 except ImportError:
     import urllib2
 
-# grab commandline args
-datasourceID = 70910
-lastUpdated = None
+datasourceID = sys.argv[1]
+pw = sys.argv[2]
+
+dbuser = 'megan'
+db = 'codeplex'
+dbhost = 'flossdata.syr.edu'
 
 
 # converts months into their number
-def month_converter(month):
-    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
-              'August', 'September', 'October', 'November', 'December']
-    return months.index(month) + 1
+def convertMonth(moName):
+    months = {'January': '01',
+              'February': '02',
+              'March': '03',
+              'April': '04',
+              'May': '05',
+              'June': '06',
+              'July': '07',
+              'August': '08',
+              'September': '09',
+              'October': '10',
+              'November': '11',
+              'December': '12'}
+    return months[moName]
 
 
 # converts date to YYYY-MM-DD format
@@ -59,46 +72,57 @@ def date_converter(listName):
     month = date[0]
     day = date[1].split(',')[0]
     year = date[2]
-    monthNum = month_converter(month)
+    monthNum = convertMonth(month)
     return '{}-{}-{}'.format(year, monthNum, day)
 
 # Open remote database connection
-dbconn = pymysql.connect(host='flossdata.syr.edu',
-                         user='',
-                         passwd='',
-                         db='',
+dbconn = pymysql.connect(host=dbhost,
+                         user=dbuser,
+                         passwd=pw,
+                         db=db,
                          use_unicode=True,
-                         charset="utf8mb4",
+                         charset='utf8mb4',
                          autocommit=True)
 cursor = dbconn.cursor()
 
-selectProjectsQuery = 'SELECT proj_name, people_html FROM cp_projects_indexes \
-                       WHERE datasource_id = %s \
-                       ORDER BY 1 \
-                       LIMIT 15'
+selectProjectsQuery = 'SELECT proj_name \
+                       FROM cp_projects_indexes \
+                       WHERE datasource_id = %s'
 
-insertHTMLQuery = 'INSERT IGNORE INTO cp_project_people \
-                   VALUES (%s, %s, %s, %s, %s, %s, %s)'
+selectProjectsIndexes = 'SELECT people_html \
+                         FROM cp_projects_indexes \
+                         WHERE datasource_id = %s \
+                         AND proj_name = %s'
+
+insertHTMLQuery = 'INSERT IGNORE INTO cp_project_people (datasource_id,\
+                                                         username,\
+                                                         personal_statement,\
+                                                         member_since,\
+                                                         last_visit,\
+                                                         user_html,\
+                                                         last_updated) \
+                   VALUES (%s, %s, %s, %s, %s, %s, now())'
+
+hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+       'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+       'Accept-Encoding': 'none',
+       'Accept-Language': 'en-US,en;q=0.8',
+       'Connection': 'keep-alive'}
 
 cursor.execute(selectProjectsQuery, (datasourceID,))
 projectList = cursor.fetchall()
 
-# insert project pages
 for project in projectList:
     projectName = project[0]
-    peopleHTML = project[1]
-    print("grabbing", projectName)
+    print('Project:', projectName)
 
-    # set up headers
-    hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
-           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-           'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
-           'Accept-Encoding': 'none',
-           'Accept-Language': 'en-US,en;q=0.8',
-           'Connection': 'keep-alive'}
+    # grab the people page
+    cursor.execute(selectProjectsIndexes, (datasourceID, projectName))
+    peopleHtml = cursor.fetchone()[0]
 
     try:
-        soup = BeautifulSoup(peopleHTML, "html.parser")
+        soup = BeautifulSoup(peopleHtml, "html.parser")
         div = soup.find("div", id="ProjectMembers")
         listOfUsers = div.find_all("a")
 
@@ -107,6 +131,7 @@ for project in projectList:
             print(username)
             userUrl = 'http://www.codeplex.com/site/users/view/' + username
 
+            # get user's html page
             req2 = urllib2.Request(userUrl, headers=hdr)
             userhtml = urllib2.urlopen(req2).read()
 
@@ -131,12 +156,16 @@ for project in projectList:
             if len(personalStatement.contents[1].contents[0]) == 1:
                 code = personalStatement.find('div', {'class': 'wikidoc'}).contents
                 for c in code:
-                   statement += str(c) + ' '
+                    statement += str(c) + ' '
             else:
                 statement = 'No personal statement has been written.'
-            print(statement)
-            lastUpdated = datetime.datetime.now()
-            # cursor.execute(insertHTMLQuery, (datasourceID, username, statement, memberSince, lastVisit, userhtml, lastUpdated))
+            # print(statement)
+            cursor.execute(insertHTMLQuery, (datasourceID,
+                                             username,
+                                             statement,
+                                             memberSince,
+                                             lastVisit,
+                                             userhtml))
             dbconn.commit()
 
     except pymysql.Error as error:
