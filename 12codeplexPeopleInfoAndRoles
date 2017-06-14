@@ -68,7 +68,6 @@ def info(username):
 
     soup2 = BeautifulSoup(userhtml, "html.parser")
     dates = soup2.find("div", id="user_left_column")
-    print(dates.find("p").contents[1])
 
     try:
         # get date user became a member
