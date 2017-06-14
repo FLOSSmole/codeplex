@@ -1,10 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Jun 14 11:46:49 2017
+# This program is free software; you can redistribute it
+# and/or modify it under the terms of GPL v3
+#
+# Copyright (C) 2004-2017 Megan Squire <msquire@elon.edu>
+# Contribution from:
+# Caroline Frankel
+#
+# We're working on this at http://flossmole.org - Come help us build
+# an open and accessible repository for data and analyses for open
+# source projects.
+#
+# If you use this code or data for preparing an academic paper please
+# provide a citation to
+#
+# Howison, J., Conklin, M., & Crowston, K. (2006). FLOSSmole:
+# A collaborative repository for FLOSS research data and analyses.
+# Int. Journal of Information Technology & Web Engineering, 1(3), 17–26.
+#
+# and
+#
+# FLOSSmole(2004-2017) FLOSSmole: a project to provide academic access to data
+# and analyses of open source projects. Available at http://flossmole.org
+#
+################################################################
+# usage:
+# 1getCodeplexPages.py <datasource_id> <db password>
 
-@author: cfrankel
-"""
+# purpose:
+# grab all the projects, contributors, their role, and how long they have been
+# a member of each project stored on Codeplex before it was shut down
+#
+# grab all the username, personal statement, date joined, and last visit date
+# of each user stored on Codeplex before it was shut down
+################################################################
 
 import pymysql
 import sys
@@ -15,15 +44,16 @@ try:
 except ImportError:
     import urllib2
 
-datasourceID = 70910 #sys.argv[1]
-#pw = sys.argv[2]
+datasourceID = sys.argv[1]
+pw = sys.argv[2]
 
-#dbuser = 'megan'
-#db = 'codeplex'
+dbuser = 'megan'
+db = 'codeplex'
 dbhost = 'flossdata.syr.edu'
 
 memberSince = None
 lastVisit = None
+
 
 # collects and inserts information on user to table
 def info(username):
@@ -38,22 +68,26 @@ def info(username):
 
     soup2 = BeautifulSoup(userhtml, "html.parser")
     dates = soup2.find("div", id="user_left_column")
-    print(dates.find("p").contents[4])
-    # get date user became a member
-    memberSinceList = dates.find("p").contents[1].contents[0]
-    if 'Member Since' in dates.find("p").contents[0]:
+    print(dates.find("p").contents[1])
+
+    try:
+        # get date user became a member
+        memberSinceList = dates.find("p").contents[1].contents[0]
         memberSince = date_converter(memberSinceList)
         print("memberSince: ", memberSince)
+    except:
+        memberSince = None
 
-    # get the last time the user visited
-    lastVisitList = dates.find("p").contents[5].contents[0]
-    if 'Last Visit' in dates.find("p").contents[4]: 
+    try:
+        # get the last time the user visited
+        lastVisitList = dates.find("p").contents[5].contents[0]
         lastVisit = date_converter(lastVisitList)
         print("lastVisit: ", lastVisit)
+    except:
+        lastVisit = None
 
     # get the user personal statement
     personal = soup2.find("div", id="user_right_column")
-    #print(personal)
     personalStatement = personal.find("p")
     statement = ''
 
@@ -63,14 +97,14 @@ def info(username):
             statement += str(c) + ' '
     else:
         statement = 'No personal statement has been written.'
-   # print(statement)
+    print(statement)
     
-    #cursor.execute(insertHTMLQuery, (datasourceID,
-     #                                username,
-      #                               statement,
-       #                              memberSince,
-        #                             lastVisit,
-         #                            userhtml))
+    cursor.execute(insertHTMLQuery, (datasourceID,
+                                     username,
+                                     statement,
+                                     memberSince,
+                                     lastVisit,
+                                     userhtml))
     dbconn.commit()
     print(username, "inserted!")
 
@@ -91,15 +125,16 @@ def convertMonth(moName):
               'December': '12'}
     return months[moName]
 
+
 # converts months into their number
 def month_converter(month):
     months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     return months.index(month) + 1
 
+
 # converts date to YYYY-MM-DD format
 def date_converter(listName):
     date = listName.split(' ')
-    #print(date)
     month = date[0]
     day = date[1].split(',')[0]
     year = date[2]
@@ -113,14 +148,14 @@ def date_converter(listName):
 
 # runs the program
 def run():
-    #cursor.execute(insertRolesQuery, (projectName, datasourceID, username, role, memberSince))
+    cursor.execute(insertRolesQuery, (projectName, datasourceID, username, role, memberSince))
     dbconn.commit()
 
 # Open remote database connection
 dbconn = pymysql.connect(host=dbhost,
-                         user='',
-                         passwd='',
-                         db='',
+                         user=dbuser,
+                         passwd=pw,
+                         db=db,
                          use_unicode=True,
                          charset='utf8mb4',
                          autocommit=True)
@@ -129,7 +164,7 @@ cursor = dbconn.cursor()
 selectProjectsQuery = 'SELECT proj_name \
                        FROM cp_projects_indexes \
                        WHERE datasource_id = %s \
-                       LIMIT 1'
+                       LIMIT 100'
 
 selectProjectsIndexes = 'SELECT people_html \
                          FROM cp_projects_indexes \
@@ -152,7 +187,7 @@ insertRolesQuery = 'INSERT INTO cp_project_people_roles (proj_name,\
                                                     project_member_since, \
                                                     last_updated) \
                   VALUES(%s, %s, %s, %s, %s, now())'
-                  
+
 hdr = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
@@ -164,7 +199,7 @@ cursor.execute(selectProjectsQuery, (datasourceID,))
 projectList = cursor.fetchall()
 
 for project in projectList:
-    projectName = '110consultingweb' #project[0]
+    projectName = project[0]
     print('Project:', projectName)
 
     # grab the people page
@@ -181,36 +216,27 @@ for project in projectList:
         for coordinator in coordinatorLine:
             username = coordinator.find('a').contents[0]
             info(username)
-            print('*********** CCCCCCCCCCCCCCCCCCCCCCCCC ***********')
 
             role = 'Coordinator'
-            print(role)
             coordinatorLine = coordinator.find('div', {'class': 'SubText'})
             memberSinceLine = coordinatorLine.find("span").contents[0]
-           # print(memberSinceLine)
             memberSince = date_converter(memberSinceLine)
-            print(memberSince)
             run()
-            print('*********** CCCCCCCC RAN CCCCCCCCCCC *************')
-           
+
         # Get all of the Developers
         listOfDevelopers = div.find("div", id="DevelopersContainer")
         developerLine = listOfDevelopers.find_all('div', {'class': 'UserDetails'})
-       # print(developerLine)
 
         for developer in developerLine:
-            #print(developer)
             username = developer.find('a').contents[0]
             info(username)
-            print('*********** DDDDDDDDDDDDDDDDDDDDDDDDD ***********')
-            
+
             role = 'Developer'
             developerLine = developer.find('div', {'class': 'SubText'})
             memberSinceLine = developerLine.find("span").contents[0]
             memberSince = date_converter(memberSinceLine)
-            
             run()
-            print('*********** DDDDDDDDDDD RAN DDDDDDDD *************')
+
         # Get all of the Editors
         listOfEditors = div.find("div", id="EditorsContainer")
         editorLine = listOfEditors.find_all('div', {'class': 'UserDetails'})
@@ -218,15 +244,13 @@ for project in projectList:
         for editor in editorLine:
             username = editor.find('a').contents[0]
             info(username)
-            print('*********** EEEEEEEEEEEEEEEEEEEEEEEEEE ***********')
-            
+
             role = 'Editor'
             editorLine = editor.find('div', {'class': 'SubText'})
             memberSinceLine = editorLine.find("span").contents[0]
             memberSince = date_converter(memberSinceLine)
             run()
-            print('*********** EEEEEEEEE RAN EEEEEEEEEE *************')
-            
+
     except pymysql.Error as error:
         print(error)
         dbconn.rollback()
