@@ -1,0 +1,14 @@
+"""
+use this query to collect information on the connections between people (like how many people they have worked with and how
+many times they worked with them)
+"""
+
+SELECT a.username, b.username, COUNT(a.proj_name)
+FROM cp_project_people_roles a
+INNER JOIN cp_project_people_roles b
+ ON a.proj_name = b.proj_name
+WHERE a.datasource_id = 70910 AND b.datasource_id = 70910
+AND a.username != b.username
+AND a.username < b.username
+GROUP BY 1,2
+ORDER BY 3 DESC
