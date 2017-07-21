@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# This program is free software; you can redistribute it
+# and/or modify it under the terms of GPL v3
+#
+# Copyright (C) 2004-2017 Megan Squire <msquire@elon.edu>
+#
+# We're working on this at http://flossmole.org - Come help us build
+# an open and accessible repository for data and analyses for open
+# source projects.
+#
+# If you use this code or data for preparing an academic paper please
+# provide a citation to
+#
+# Howison, J., Conklin, M., & Crowston, K. (2006). FLOSSmole:
+# A collaborative repository for FLOSS research data and analyses.
+# Int. Journal of Information Technology & Web Engineering, 1(3), 17–26.
+#
+# and
+#
+# FLOSSmole(2004-2017) FLOSSmole: a project to provide academic access to data
+# and analyses of open source projects. Available at http://flossmole.org
+#
+################################################################
+# usage:
+#
+# 12codeplexProjPeopleNetworkx <datasource_id> <db password>
+#
+# purpose:
+# compares people who worked together on projects to the amount of times they worked together
+# creates a networkx image of people (nodes) that have 300+ connections
+# puts the two people with the highest number of connections in a different bubble color
+# outlines the people they worked with twice (compared to once) in a different line color
+# puts a colored line connecting the two people with the most connections
+################################################################
+import networkx as nx
+import matplotlib.pyplot as plt
+
+g = nx.read_weighted_edgelist('codeplexProjPeople.txt')
+degree = nx.degree(g)
+
+
+# what if we look for subgraphs instead
+# first, make sure the graph isn't really 100% connected.
+print(nx.is_connected(g))
+
+# next, see how many pieces the graph is actually in
+print(nx.number_connected_components(g))
+
+# try to make the graph more understandable
+# (1) remove nodes that only have one connection, to shrink size of drawing
+g2 = g.copy()
+d2 = nx.degree(g2)
+for n in g2.nodes():
+    if d2[n] <= 300:
+        g2.remove_node(n)
+
+# then, pull out each of these connected components
+# and sort them by the number of nodes in them
+graphs = list(nx.connected_component_subgraphs(g2))
+graphsSorted = sorted(graphs, key=len, reverse=True)
+
+
+# for the largest graph, print the number of nodes
+# and draw the graph in a file
+graphDegree = nx.degree(graphsSorted[0])
+print("num nodes in graphsSorted[0]:", nx.number_of_nodes(graphsSorted[0]))
+
+pos = nx.spring_layout(g2)
+
+# draw one set with name labels
+f1 = plt.figure()
+nx.draw(graphsSorted[0],
+        pos,
+        node_size=[v * 100 for v in graphDegree.values()],
+        edge_size=100,
+        with_labels=True,
+        font_size=12,
+        width=1,
+        node_color='#7bb3ff')
+
+# puts the two people with the highest connections in a different color
+nx.draw_networkx_nodes(graphsSorted[0]
+                       pos,
+                       nodelist=['govindk', 'sakthiveluv'],
+                       node_size=[v * 100 for v in graphDegree.values()],
+                       node_color='#e86af0')
+
+# Work with sakthieveluv or govindk two times
+nx.draw_networkx_edges(graphsSorted[0],
+                       pos,
+                       edgelist=[('adudau', 'vardoit'),
+                                 ('sakthiveluv', 'pekollik'),
+                                 ('sakthiveluv', 'riteshmeher'),
+                                 ('sakthiveluv', 'renjieluo'),
+                                 ('govindk', 'mdelgert'),
+                                 ('govindk', 'adudau'),
+                                 ('govindk', 'muhamad_iqbal1987'),
+                                 ('govindk', 'renjieluo'),
+                                 ('govindk', 'soffoalbert'),
+                                 ('govindk', 'ONURAG19')],
+                       width=3,
+                       edge_color='r')
+# connects the two people with the most connections with a different color line
+nx.draw_networkx_edges(graphsSorted[0],
+                       pos,
+                       edgelist=[('govindk', 'sakthiveluv')],
+                       width=3,
+                       edge_color='#ffa500')
+
+filename1 = 'codeplexProjPeopleRegular.png'
+f1.savefig(filename1)
